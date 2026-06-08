@@ -612,5 +612,5 @@ with col_raw:
 st.markdown("<hr style='opacity: 0.1;'>", unsafe_allow_html=True)
 st.caption("AeroSky Weather intelligence. Data dynamically retrieved from Open-Meteo. No API Key required.")
 
-        st.markdown("---")
-        st.caption("Data provided by Open-Meteo (no API key required)")
+st.markdown("<hr style='opacity: 0.1;'>", unsafe_allow_html=True)
+st.caption("AeroSky Weather intelligence. Data dynamically retrieved from Open-Meteo. No API Key required.")
