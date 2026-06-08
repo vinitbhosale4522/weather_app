@@ -3,6 +3,8 @@ import requests
 import pandas as pd
 import altair as alt
 from datetime import datetime
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 # Set page configuration
 st.set_page_config(
@@ -94,6 +96,18 @@ st.markdown(
     unsafe_allow_html=True
 )
 
+
+# Shared session with retries
+session = requests.Session()
+retries = Retry(
+    total=3,
+    backoff_factor=2,
+    status_forcelist=[429, 500, 502, 503, 504],
+    allowed_methods=["GET"]
+)
+session.mount("https://", HTTPAdapter(max_retries=retries))
+
+
 # WMO Weather Codes mapping (Description, Emoji, CSS Background Gradient)
 WMO_CODES = {
     0: ("Clear sky", "☀️", "linear-gradient(135deg, #FDEB71 10%, #F8D800 100%)"),
@@ -134,13 +148,15 @@ def get_wind_direction(degrees):
     idx = int((degrees + 11.25) / 22.5) % 16
     return directions[idx]
 
+@st.cache_data(ttl=3600)
 def geocode(name):
     url = "https://geocoding-api.open-meteo.com/v1/search"
     params = {"name": name, "count": 10, "language": "en", "format": "json"}
-    r = requests.get(url, params=params, timeout=10)
+    r = session.get(url, params=params, timeout=15)
     r.raise_for_status()
     return r.json().get("results", [])
 
+@st.cache_data(ttl=600)
 def fetch_weather(lat, lon, days=7, temp_unit="°C", wind_unit="km/h"):
     url = "https://api.open-meteo.com/v1/forecast"
     
@@ -164,7 +180,9 @@ def fetch_weather(lat, lon, days=7, temp_unit="°C", wind_unit="km/h"):
         "forecast_days": days,
         "timezone": "auto",
     }
-    r = requests.get(url, params=params, timeout=10)
+    r = session.get(url, params=params, timeout=15)
+    if r.status_code == 429:
+        raise Exception('Open-Meteo rate limit reached. Please try again in a few minutes.')
     r.raise_for_status()
     return r.json()
 
@@ -608,9 +626,7 @@ with col_raw:
     else:
         st.info("No hourly data is currently populated.")
 
-# Footer
-st.markdown("<hr style='opacity: 0.1;'>", unsafe_allow_html=True)
-st.caption("AeroSky Weather intelligence. Data dynamically retrieved from Open-Meteo. No API Key required.")
 
+# Footer
 st.markdown("<hr style='opacity: 0.1;'>", unsafe_allow_html=True)
 st.caption("AeroSky Weather intelligence. Data dynamically retrieved from Open-Meteo. No API Key required.")
